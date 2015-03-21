@@ -70,6 +70,12 @@ static NSString *QQAPPKey = @"";
     [WeiboSDK sendRequest:request];
 }
 
+- (void)getThirdUserInfoWithLoginInfo:(PCLoginInfo *)loginInfo completion:(void (^)(id, NSError *))completion
+{
+    NSString *requestUrl = [NSString stringWithFormat:@"https://api.weibo.com/2/users/show.json?access_token=%@&uid=%@", loginInfo.token, loginInfo.uid];
+    [self sendRequestUrl:requestUrl completion:completion];
+}
+
 #pragma mark - Weibo Delegate
 
 - (void)didReceiveWeiboRequest:(WBBaseRequest *)request
@@ -85,15 +91,41 @@ static NSString *QQAPPKey = @"";
         loginInfo.userType = self.currentUserType;
         loginInfo.uid = resp.userID;
         loginInfo.token = resp.accessToken;
-        loginInfo.refreshToken = resp.refreshToken;
+//        loginInfo.refreshToken = resp.refreshToken;
         loginInfo.expiationDate = resp.expirationDate;
         
         if (resp.accessToken) {
-            NSData *data = [NSKeyedArchiver archivedDataWithRootObject:loginInfo];
-            [[NSUserDefaults standardUserDefaults] setObject:data forKey:kWeiboStoreKey];
-            if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
-                [self.delegate userAuthenticationWithLoginInfo:loginInfo status:PCLoginStatusSuccess];
-            }
+            [self getThirdUserInfoWithLoginInfo:loginInfo completion:^(id responseObj, NSError *error) {
+                if (!error) {
+                    if ([responseObj isKindOfClass:[NSDictionary class]]) {
+                        NSDictionary *dict = (NSDictionary *)responseObj;
+                        NSString *code = dict[@"error_code"];
+                        if (code == nil) {
+                            loginInfo.nick = dict[@"name"];
+                            loginInfo.headImageUrl = dict[@"profile_image_url"];
+                            
+                            NSData *data = [NSKeyedArchiver archivedDataWithRootObject:loginInfo];
+                            [[NSUserDefaults standardUserDefaults] setObject:data forKey:kWeiboStoreKey];
+                            
+                            if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
+                                [self.delegate userAuthenticationWithLoginInfo:loginInfo status:PCLoginStatusSuccess];
+                            }
+                        } else {
+                            if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
+                                [self.delegate userAuthenticationWithLoginInfo:loginInfo status:PCLoginStatusFailure];
+                            }
+                        }
+                    } else {
+                        if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
+                            [self.delegate userAuthenticationWithLoginInfo:loginInfo status:PCLoginStatusFailure];
+                        }
+                    }
+                } else {
+                    if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
+                        [self.delegate userAuthenticationWithLoginInfo:loginInfo status:PCLoginStatusFailure];
+                    }
+                }
+            }];
         } else {
             if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
                 [self.delegate userAuthenticationWithLoginInfo:nil status:PCLoginStatusFailure];
@@ -163,6 +195,12 @@ static NSString *QQAPPKey = @"";
     [self sendRequestUrl:requestUrl completion:completion];
 }
 
+- (void)getThirdUserInfoWithLoginInfo:(PCLoginInfo *)loginInfo completion:(void (^)(id, NSError *))completion
+{
+    NSString *requestUrl = [NSString stringWithFormat:@"https://api.weixin.qq.com/sns/userinfo?access_token=%@&openid=%@", loginInfo.token, loginInfo.uid];
+    [self sendRequestUrl:requestUrl completion:completion];
+}
+
 - (void)parserJsonObj:(id)responseObj
 {
     //获取鉴权结果
@@ -178,12 +216,42 @@ static NSString *QQAPPKey = @"";
             loginInfo.refreshToken = dict[@"refresh_token"];
             loginInfo.expiationDate = [NSDate dateWithTimeIntervalSinceNow:[dict[@"expires_in"] integerValue]];
             
-            NSData *data = [NSKeyedArchiver archivedDataWithRootObject:loginInfo];
-            [[NSUserDefaults standardUserDefaults] setObject:data forKey:kWechatStoreKey];
-            
-            if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
-                [self.delegate userAuthenticationWithLoginInfo:loginInfo status:PCLoginStatusSuccess];
-            }
+            [self getThirdUserInfoWithLoginInfo:loginInfo completion:^(id responseObj, NSError *error) {
+                //错误码返回值不一致，需做处理
+                if (!error) {
+                    if ([responseObj isKindOfClass:[NSDictionary class]]) {
+                        NSDictionary *dict = (NSDictionary *)responseObj;
+                        NSString *code = dict[@"errcode"];
+                        if (code == nil) {
+                            loginInfo.nick = dict[@"nickname"];
+                            loginInfo.headImageUrl = dict[@"headimgurl"];
+                            loginInfo.unionID = dict[@"unionid"];
+                            
+                            NSData *data = [NSKeyedArchiver archivedDataWithRootObject:loginInfo];
+                            [[NSUserDefaults standardUserDefaults] setObject:data forKey:kWechatStoreKey];
+                            
+                            if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
+                                [self.delegate userAuthenticationWithLoginInfo:loginInfo status:PCLoginStatusSuccess];
+                            }
+                        } else {
+                            //登录失败
+                            if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
+                                [self.delegate userAuthenticationWithLoginInfo:loginInfo status:PCLoginStatusFailure];
+                            }
+                        }
+                    } else {
+                        //登录失败
+                        if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
+                            [self.delegate userAuthenticationWithLoginInfo:loginInfo status:PCLoginStatusFailure];
+                        }
+                    }
+                } else {
+                    //登录失败
+                    if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
+                        [self.delegate userAuthenticationWithLoginInfo:loginInfo status:PCLoginStatusFailure];
+                    }
+                }
+            }];
         } else {
             //登录失败
             [[NSUserDefaults standardUserDefaults] removeObjectForKey:kWechatStoreKey];
@@ -226,6 +294,7 @@ static NSString *QQAPPKey = @"";
 @interface PCQQUserAuthenticationService : PCUserAuthenticationService<TencentSessionDelegate>
 
 @property (strong, nonatomic) TencentOAuth *tencentOAuth;
+@property (strong, nonatomic) PCLoginInfo *loginInfo;
 
 @end
 
@@ -253,18 +322,13 @@ static NSString *QQAPPKey = @"";
 - (void)loginQQInfo
 {
     if (self.tencentOAuth.accessToken && self.tencentOAuth.expirationDate && self.tencentOAuth.openId) {
-        PCLoginInfo *loginInfo = [[PCLoginInfo alloc] init];
-        loginInfo.userType = self.currentUserType;
-        loginInfo.uid = self.tencentOAuth.openId;
-        loginInfo.token = self.tencentOAuth.accessToken;
-        loginInfo.expiationDate = self.tencentOAuth.expirationDate;
+        self.loginInfo = [[PCLoginInfo alloc] init];
+        self.loginInfo.userType = self.currentUserType;
+        self.loginInfo.uid = self.tencentOAuth.openId;
+        self.loginInfo.token = self.tencentOAuth.accessToken;
+        self.loginInfo.expiationDate = self.tencentOAuth.expirationDate;
         
-        NSData *data = [NSKeyedArchiver archivedDataWithRootObject:loginInfo];
-        [[NSUserDefaults standardUserDefaults] setObject:data forKey:KQQStoreKey];
-        
-        if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
-            [self.delegate userAuthenticationWithLoginInfo:loginInfo status:PCLoginStatusSuccess];
-        }
+        [self.tencentOAuth getUserInfo];
     } else {
         if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
             [self.delegate userAuthenticationWithLoginInfo:nil status:PCLoginStatusFailure];
@@ -287,6 +351,27 @@ static NSString *QQAPPKey = @"";
 - (void)tencentDidNotLogin:(BOOL)cancelled
 {
     [self loginQQInfo];
+}
+
+- (void)getUserInfoResponse:(APIResponse *)response
+{
+    if ([response.jsonResponse isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *dict = (NSDictionary *)response.jsonResponse;
+        
+        self.loginInfo.nick = dict[@"nickname"];
+        self.loginInfo.headImageUrl = dict[@"figureurl_qq_2"];
+        
+        NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self.loginInfo];
+        [[NSUserDefaults standardUserDefaults] setObject:data forKey:KQQStoreKey];
+        
+        if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
+            [self.delegate userAuthenticationWithLoginInfo:self.loginInfo status:PCLoginStatusSuccess];
+        }
+    } else {
+        if ([self.delegate respondsToSelector:@selector(userAuthenticationWithLoginInfo:status:)]) {
+            [self.delegate userAuthenticationWithLoginInfo:self.loginInfo status:PCLoginStatusFailure];
+        }
+    }
 }
 
 @end
@@ -388,6 +473,11 @@ static NSString *QQAPPKey = @"";
 }
 
 - (void)login
+{
+    
+}
+
+- (void)getThirdUserInfoWithLoginInfo:(PCLoginInfo *)loginInfo completion:(void (^)(id, NSError *))completion
 {
     
 }

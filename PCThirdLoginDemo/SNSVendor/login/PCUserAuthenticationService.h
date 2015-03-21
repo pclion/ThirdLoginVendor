@@ -92,6 +92,11 @@ typedef enum : NSUInteger {
 - (void)login;
 
 /**
+ *  获取第三方用户信息
+ */
+- (void)getThirdUserInfoWithLoginInfo:(PCLoginInfo *)loginInfo completion:(void (^)(id responseObj, NSError *error))completion;
+
+/**
  *  内部方法
  *
  *  @param url        url
@@ -111,5 +116,9 @@ typedef enum : NSUInteger {
 @property (nonatomic, copy) NSString *token;
 @property (nonatomic, copy) NSString *refreshToken;
 @property (nonatomic, copy) NSDate *expiationDate;
+
+@property (nonatomic, copy) NSString *nick;
+@property (nonatomic, copy) NSString *headImageUrl;
+@property (nonatomic, copy) NSString *unionID;
 
 @end

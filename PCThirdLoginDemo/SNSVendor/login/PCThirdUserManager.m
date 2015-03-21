@@ -8,9 +8,14 @@
 
 #import "PCThirdUserManager.h"
 
+
+NSString * const OJAWeChatAPPKey = @"wx5bc067c5c1073564";
+NSString * const OJAWeChatAPPSecret = @"773569756f5b73aca618e12866b0a5bc";
+
 @interface PCThirdUserManager ()
 
 @property (nonatomic, strong) PCUserAuthenticationService *userService;
+@property (nonatomic, strong) id<PCUserAuthenticationServiceDelegate> delegate;
 
 @end
 
@@ -39,11 +44,12 @@
 - (void)setupWithUserType:(PCUserType)userType
 {
     self.userService = [PCUserAuthenticationService userAuthenticationServiceWithUserType:userType];
+    self.userService.delegate = self.delegate;
 }
 
 - (void)setServiceDelegate:(id<PCUserAuthenticationServiceDelegate>)delegate
 {
-    self.userService.delegate = delegate;
+    self.delegate = delegate;
 }
 
 - (void)login
