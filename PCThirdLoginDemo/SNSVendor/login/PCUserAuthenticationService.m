@@ -32,6 +32,9 @@ static NSString *QQAPPKey = @"";
     [aCoder encodeObject:self.token forKey:@"token"];
     [aCoder encodeObject:self.refreshToken forKey:@"refreshToken"];
     [aCoder encodeObject:self.expiationDate forKey:@"expiationDate"];
+    [aCoder encodeObject:self.nick forKey:@"nick"];
+    [aCoder encodeObject:self.headImageUrl forKey:@"headImageUrl"];
+    [aCoder encodeObject:self.unionID forKey:@"unionID"];
 }
 
 - (id)initWithCoder:(NSCoder *)aDecoder
@@ -43,6 +46,9 @@ static NSString *QQAPPKey = @"";
         self.token = [aDecoder decodeObjectForKey:@"token"];
         self.refreshToken = [aDecoder decodeObjectForKey:@"refreshToken"];
         self.expiationDate = [aDecoder decodeObjectForKey:@"expiationDate"];
+        self.nick = [aDecoder decodeObjectForKey:@"nick"];
+        self.headImageUrl = [aDecoder decodeObjectForKey:@"headImageUrl"];
+        self.unionID = [aDecoder decodeObjectForKey:@"unionID"];
     }
     return self;
 }

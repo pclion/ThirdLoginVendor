@@ -50,6 +50,7 @@ NSString * const OJAWeChatAPPSecret = @"773569756f5b73aca618e12866b0a5bc";
 - (void)setServiceDelegate:(id<PCUserAuthenticationServiceDelegate>)delegate
 {
     self.delegate = delegate;
+    self.userService.delegate = self.delegate;
 }
 
 - (void)login
